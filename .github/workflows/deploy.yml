@@ -5,10 +5,11 @@ on:
     branches: [ "main" ]
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.REGION }}
-  SERVICE: ${{ secrets.CLOUD_RUN_SERVICE }}
-  REPO: ${{ secrets.ARTIFACT_REPOSITORY }}
+  PROJECT_ID: ${{ vars.PROJECT_ID }}
+  REGION: ${{ vars.REGION }}
+  SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+  REPO: ${{ vars.ARTIFACT_REPOSITORY }}
+
 
 jobs:
   deploy:
@@ -26,8 +27,7 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-
+          project_id: ${{ vars.PROJECT_ID }}
 
       - name: Configure Docker for Artifact Registry
         run: |
