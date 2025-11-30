@@ -5,40 +5,34 @@ steps:
     args: ["install"]
     id: install
 
-  # 2. Start Cloud SQL Proxy in the background
-  # This listens on localhost:5432 and tunnels to your Google Cloud SQL instance
-  - name: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.1.0
-    args:
-      - "--structured-logs"
-      - "--port=5432"
-      - "${_CLOUDSQL_CONNECTION}"
-    id: proxy
-    waitFor: ['-'] # Start immediately, don't wait for previous steps
-
-  # 3. Run Prisma migration (Connects via TCP to Localhost Proxy)
+  # 2. Run Prisma migration (With built-in Proxy)
   - name: node:18
     entrypoint: sh
     args:
       - -c
       - |
-        # Wait a few seconds for the proxy to initialize
-        sleep 5 
+        # A. Download the Cloud SQL Proxy tool
+        wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
+        chmod +x cloud_sql_proxy
+
+        # B. Start the Proxy in the background (&) and wait 5 seconds
+        ./cloud_sql_proxy -instances=${_CLOUDSQL_CONNECTION}=tcp:5432 & sleep 5
+
+        # C. Run the migration (Connecting to localhost)
         npx prisma migrate deploy
     env:
-      # NOTE: For the BUILD step, we use 127.0.0.1 (TCP), not the socket path
+      # Connect to the local proxy we just started
       - DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@127.0.0.1:5432/postgres?schema=public
-    waitFor: ['install', 'proxy'] # Wait for install to finish and proxy to start
 
-  # 4. Build the Docker image
+  # 3. Build the Docker image
   - name: gcr.io/cloud-builders/docker
     args: ["build", "-t", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA", "."]
-    waitFor: ['install'] # Can start as soon as install is done (doesn't need migration)
 
-  # 5. Push the Docker image
+  # 4. Push the Docker image
   - name: gcr.io/cloud-builders/docker
     args: ["push", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"]
 
-  # 6. Deploy to Cloud Run
+  # 5. Deploy to Cloud Run
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
@@ -49,7 +43,7 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated",
         "--add-cloudsql-instances", "${_CLOUDSQL_CONNECTION}",
-        # NOTE: For CLOUD RUN, we switch back to the Socket path. This is correct here.
+        # Note: Back to Unix Socket for the live app
         "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public",
         "--set-env-vars", "PORT=4000"
       ]
