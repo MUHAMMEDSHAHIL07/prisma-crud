@@ -5,23 +5,20 @@ steps:
     args: ["install"]
     id: install
 
-  # 2. Run Prisma migration (With 60s timeout)
+  # 2. Run Prisma migration
   - name: node:18
     entrypoint: sh
     args:
       - -c
       - |
-        # Download Cloud SQL Proxy
+        # Download and run the proxy in background
         wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
         chmod +x cloud_sql_proxy
-        
-        # Start Proxy in background
         ./cloud_sql_proxy -instances=${_CLOUDSQL_CONNECTION}=tcp:5432 & sleep 5
         
         # Run migration
         npx prisma migrate deploy
     env:
-      # LOOK HERE: Added "&connect_timeout=60" at the end
       - DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@127.0.0.1:5432/postgres?schema=public&connect_timeout=60
 
   # 3. Build the Docker image
@@ -43,9 +40,7 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated",
         "--add-cloudsql-instances", "${_CLOUDSQL_CONNECTION}",
-        # Keep the socket connection for the live app
-        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public",
-        "--set-env-vars", "PORT=4000"
+        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
       ]
 
 options:
