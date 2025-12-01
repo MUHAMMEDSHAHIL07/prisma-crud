@@ -40,7 +40,7 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated",
         "--add-cloudsql-instances", "${_CLOUDSQL_CONNECTION}",
-        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
+        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@localhost/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
       ]
 
 options:
