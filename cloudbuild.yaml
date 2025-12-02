@@ -1,35 +1,49 @@
 steps:
-  # 1. Install Node dependencies
   - name: node:18
     entrypoint: npm
     args: ["install"]
     id: install
 
-  # 2. Run Prisma migration
+  - name: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0"
+    entrypoint: /cloud-sql-proxy
+    args:
+      [
+        "${_CLOUDSQL_CONNECTION}",
+        "--address=0.0.0.0",
+        "--port=5432"
+      ]
+    background: true
+
+  - name: "busybox"
+    args: ["sh", "-c", "sleep 5"]
+
+
   - name: node:18
     entrypoint: sh
     args:
       - -c
       - |
-        # Download and run the proxy in background
-        wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O cloud_sql_proxy
-        chmod +x cloud_sql_proxy
-        ./cloud_sql_proxy -instances=${_CLOUDSQL_CONNECTION}=tcp:5432 & sleep 5
-        
-        # Run migration
         npx prisma migrate deploy
     env:
       - DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@127.0.0.1:5432/postgres?schema=public&connect_timeout=60
 
-  # 3. Build the Docker image
   - name: gcr.io/cloud-builders/docker
-    args: ["build", "-t", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA", "."]
+    args:
+      [
+        "build",
+        "-t", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA",
+        "."
+      ]
 
-  # 4. Push the Docker image
+
   - name: gcr.io/cloud-builders/docker
-    args: ["push", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"]
+    args:
+      [
+        "push",
+        "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"
+      ]
 
-  # 5. Deploy to Cloud Run
+
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
@@ -40,7 +54,8 @@ steps:
         "--platform", "managed",
         "--allow-unauthenticated",
         "--add-cloudsql-instances", "${_CLOUDSQL_CONNECTION}",
-        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@localhost/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
+        "--set-env-vars",
+        "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@localhost/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
       ]
 
 options:
