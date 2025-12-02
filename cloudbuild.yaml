@@ -1,20 +1,22 @@
 steps:
-  # 1. Install Node dependencies
+  # 0. Install dependencies
   - name: node:18
     entrypoint: npm
     args: ["install"]
-    id: install
 
-  # 2. Start Cloud SQL Proxy v2 (run in background using &)
-  - name: "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.11.0"
+  # 1. Cloud SQL Proxy (needs real shell)
+  - name: alpine:3.18
     entrypoint: sh
     args:
       - -c
       - |
-        /cloud-sql-proxy ${_CLOUDSQL_CONNECTION} --port=5432 & 
-        sleep 5
+        apk add --no-cache wget
+        wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.11.0/cloud-sql-proxy.linux.amd64 -O cloud-sql-proxy
+        chmod +x cloud-sql-proxy
+        ./cloud-sql-proxy ${_CLOUDSQL_CONNECTION} --port=5432 &
+        sleep 6
 
-  # 3. Run Prisma migration
+  # 2. Run Prisma Migrations
   - name: node:18
     entrypoint: sh
     args:
@@ -24,7 +26,7 @@ steps:
     env:
       - DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@127.0.0.1:5432/postgres?schema=public&connect_timeout=60
 
-  # 4. Build the Docker image
+  # 3. Build Docker image
   - name: gcr.io/cloud-builders/docker
     args:
       [
@@ -33,7 +35,7 @@ steps:
         "."
       ]
 
-  # 5. Push the Docker image
+  # 4. Push Docker image
   - name: gcr.io/cloud-builders/docker
     args:
       [
@@ -41,7 +43,7 @@ steps:
         "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"
       ]
 
-  # 6. Deploy to Cloud Run
+  # 5. Deploy Cloud Run Service
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
