@@ -21,7 +21,7 @@ model Product {
   id         String      @id @default(uuid())
   name       String
   price      Float
-  user       User        @relation(fields: [userId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
   userId     String?
   orderItems OrderItem[]
   category   Category?   @relation(fields: [categoryId], references: [id])
