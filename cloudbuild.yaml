@@ -33,7 +33,6 @@ steps:
         echo "Cloud SQL Proxy is ready after $i seconds."
 
         # --- 3. RUN PRISMA MIGRATIONS (Proxy is now guaranteed to be running in the SAME container)
-        npx prisma migrate resolve --applied "20251202063400_add_order_and_category_relations"
         npx prisma migrate deploy
         
     env:
