@@ -4,17 +4,33 @@ steps:
     entrypoint: npm
     args: ["install"]
 
-  # 1. Cloud SQL Proxy (needs real shell)
+  # 1. Cloud SQL Proxy with Robust Waiting 
   - name: alpine:3.18
     entrypoint: sh
     args:
       - -c
       - |
-        apk add --no-cache wget
+        # Install tools: wget for downloading, busybox-extras for 'nc' (netcat)
+        apk add --no-cache wget busybox-extras
+        
+        # Download, chmod, and start the proxy in the background
         wget https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.11.0/cloud-sql-proxy.linux.amd64 -O cloud-sql-proxy
         chmod +x cloud-sql-proxy
         ./cloud-sql-proxy ${_CLOUDSQL_CONNECTION} --port=5432 &
-        sleep 6
+        
+        # >>> ROBUST WAIT CHECK <<<
+        # Actively checks if 127.0.0.1:5432 is listening.
+        echo "Waiting for Cloud SQL Proxy to start listening on 5432..."
+        i=0
+        while ! nc -z 127.0.0.1 5432; do
+          if [ $i -ge 30 ]; then # Fail after 30 seconds if connection is not established
+            echo "Error: Cloud SQL Proxy failed to start within 30 seconds."
+            exit 1
+          fi
+          sleep 1
+          i=$((i+1))
+        done
+        echo "Cloud SQL Proxy is ready after $i seconds."
 
   # 2. Run Prisma Migrations
   - name: node:18
@@ -47,15 +63,20 @@ steps:
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
-      [
-        "run", "deploy", "${_SERVICE_NAME}",
-        "--image", "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA",
-        "--region", "${_REGION}",
-        "--platform", "managed",
-        "--allow-unauthenticated",
-        "--add-cloudsql-instances", "${_CLOUDSQL_CONNECTION}",
-        "--set-env-vars", "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@localhost/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
-      ]
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:$SHORT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--add-cloudsql-instances"
+      - "${_CLOUDSQL_CONNECTION}"
+      - "--set-env-vars"
+      - "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@localhost/postgres?host=/cloudsql/${_CLOUDSQL_CONNECTION}&schema=public"
 
 options:
   logging: CLOUD_LOGGING_ONLY
