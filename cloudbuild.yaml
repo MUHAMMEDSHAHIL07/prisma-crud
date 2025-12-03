@@ -4,7 +4,7 @@ steps:
     entrypoint: npm
     args: ["install"]
 
-  # 1. COMBINED STEP: Start Proxy, Wait, and Run Prisma Migrations 🚀
+  # 1. COMBINED STEP: Start Proxy, Wait, and Run Prisma Migrations 
   - name: node:18  # Using node:18 as it has the environment needed for Prisma
     entrypoint: sh
     args:
