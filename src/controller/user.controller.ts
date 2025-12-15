@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { createUserService, updateUserService, deleteUserService, getUserService } from "../services/user.service";
+import { createUserService, updateUserService, deleteUserService, getUserService, getUserByIdService } from "../services/user.service";
 
 export const createUser = async (req: Request, res: Response) => {
   try {
@@ -19,6 +19,14 @@ export const getUsers = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserById = async (req: Request, res: Response) => {
+  try {
+    const user = await getUserByIdService(req.params.id)
+    res.json(user)
+  } catch (error: any) {
+    res.status(500).json({ error: error.message })
+  }
+}
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const user = await updateUserService(req.params.id, req.body);

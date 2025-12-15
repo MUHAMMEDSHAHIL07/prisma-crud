@@ -9,6 +9,9 @@ export const getUserService = async () => {
   return await prisma.user.findMany();
 };
 
+export const getUserByIdService = async (id: string) => {
+  return await prisma.user.findUnique({ where: { id } })
+}
 export const updateUserService = async (id: string, data: Prisma.UserUpdateInput) => {
   return await prisma.user.update({
     where: { id },
